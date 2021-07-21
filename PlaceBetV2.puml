@@ -2,69 +2,85 @@
 title ** PlaceBetV2 **
 skinparam ConditionEndStyle hline
 start
--> amount, tpTransId;
-#PaleGreen:Get Bonus;
-note right
-  walletService.SetBonus()
-  ====
-  * SP: Service_BonusWallet_Set
-end note
--> bonusId, afterAmount;
-if (bonusId > 0) then (true)
+-> bHasBonusWallet,amount, tpTransId;
+if(bHasBonusWallet) then (true)
 
-#PaleGreen:Get Bonus Min Bet;
-note right
-  thirdPartyBLL.GetBonusMinBet()
-  ====
-  * SP: Service_BonusMinBet_Get
-end note
--> bonusId, afterAmount, MinBet;
-
-if (afterAmount >= 0 \n And \n MinBet > (Math.Abs(amount) + afterAmount)) then (true)
-  :bonusId=0;
-elseif (afterAmount < 0  \n And \n MinBet > (Math.Abs(amount) - Math.Abs(afterAmount))) then (true)
-  :bonusId=0;
-elseif (tpTransId != null) then (true)
-  #PaleGreen:Add Tp Bonus;
+  #PaleGreen:Set Bonus;
   note right
-    AddTpBonus()
+    walletService.SetBonus()
     ====
-    * SP: Service_Tp{tpCategory}Bonus_Ins
+    * SP: Service_BonusWallet_Set
   end note
-endif
--> bonusId;
+  -> bonusId, afterAmount;
+  if (bonusId > 0) then (true)
 
-if (afterAmount < 0) then (true)
-  :amount = afterAmount;
-else (flase)
-  :GetBalance;
+    #PaleGreen:Get Bonus Min Bet;
     note right
-    walletService.GetBalance()
-    ====
-    * SP: Balance_Get
-  end note
-  -> Balance;
-  :afterAmount = afterAmount + Balance;
-  -> afterAmount;
-  stop
-endif
+      thirdPartyBLL.GetBonusMinBet()
+      ====
+      * SP: Service_BonusMinBet_Get
+    end note
+    -> bonusId, afterAmount, MinBet;
 
+    if (afterAmount >= 0 \n And \n MinBet > (Math.Abs(amount) + afterAmount)) then (true)
+      :bonusId=0;
+    elseif (afterAmount < 0  \n And \n MinBet > (Math.Abs(amount) - Math.Abs(afterAmount))) then (true)
+      :bonusId=0;
+    elseif (tpTransId != null) then (true)
+      #PaleGreen:Add Tp Bonus;
+      note right
+      BettingService.AddTpBonus()
+      ====
+      * SP: Service_Tp{tpCategory}Bonus_Ins
+      end note
+    endif
+    
+    -> bonusId;
 
+    if (afterAmount < 0) then (true)
+    :amount = afterAmount;
+    else (false)
+        #PaleGreen:GetBalance;
+          note right
+          walletService.GetBalance()
+          ====
+          * SP: Balance_Get
+        end note
+        -> Balance;
+        :afterAmount = afterAmount + Balance;
+        -> afterAmount;
+        stop
+    endif
+    
+  elseif (bonusId == 0) then(true)
+      #PaleGreen:Set Balance;
+      note right
+      walletService.SetBalance()
+      ====
+      * SP: 
+          Allow Negative: Service_SeamlessWallet_Set
+          NotAllow Negative: Wallet_Set
+      end note
+  endif
 
-
-
-
-
-endif
-
-#PaleGreen:Set Balance;
-note right
+  #PaleGreen:Set Balance;
+  note right
   walletService.SetBalance()
   ====
   * SP: 
-        Allow Negative: Service_SeamlessWallet_Set
-        NotAllow Negative: Wallet_Set
-end note
+      Allow Negative: Service_SeamlessWallet_Set
+      NotAllow Negative: Wallet_Set
+  end note
+else ()
+  #PaleGreen:Set Balance;
+  note right
+  walletService.SetBalance()
+  ====
+  * SP: 
+      Allow Negative: Service_SeamlessWallet_Set
+      NotAllow Negative: Wallet_Set
+  end note
+endif
 -> afterAmount;
   stop
 @enduml

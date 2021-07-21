@@ -1,0 +1,485 @@
+@startuml Settled
+title ** Settled **
+skinparam ConditionEndStyle hline
+start
+->  tpCustInfo,  betRecordInfo,  tpCategory;
+#PaleGreen:Get TpBonus;
+note right
+  settledService.GetTpBonus()
+  ====
+  * SP: Service_Tp{tpCategory}Bonus_Get
+end note
+-> bonusId;
+:betRecordInfo.BonusId = bonusId;
+partition SettleTicket{ 
+    #PaleGreen:Get TpBetRecord;
+    note right
+    settledService.GetTpBetRecord()
+    ====
+    * SP: Service_TpBetRecord_Get
+    end note
+    -> RefBetRecord;
+    partition Payout_Process {
+        if (doPayout \n AND \n RefBetRecord == null ) then (true)
+        :result=-1;
+        stop
+        elseif (doPayout  \n AND \n RefBetRecord.TicketStatus != UnSettled) then (true)
+        :result=-1;
+        stop
+        else ()
+            if (betRecord.Stake == 0 \n AND \n RefBetRecord != null) then (true)
+            :betRecord.Stake = RefBetRecord.Stake;     
+            endif
+            
+            if(betRecord.TicketStatus == Lost \n AND \n doPayout \n AND \n backAmount == 0) then (true)
+            :betRecord.WinlostAmount = -betRecord.Stake;
+            elseif(betRecord.TicketStatus != Refund \n AND \n betRecord.SettlementType != UnSettled) then (ture)
+                
+                if (doPayout) then (true)
+                :betRecord.WinlostAmount = backAmount - betRecord.Stake; 
+                endif
+
+                if(betRecord.WinlostAmount > 0) then (true)
+                            if (betRecord.Stake != 0) then                    
+                            :betRecord.TicketStatus = Win;         
+                            else()       
+                            :betRecord.TicketStatus = FreeBetWin;
+                            endif
+                elseif(betRecord.WinlostAmount == 0) then (true)
+                :betRecord.TicketStatus = Draw;
+                else()
+                :betRecord.TicketStatus = Lost;
+                endif
+            endif
+
+            if (backAmount > 0 \n AND \n doPayout) then (true)
+                        if (betRecord.TicketStatus == TicketStatus.Refund) then (true)
+                            #PaleGreen:Set Balance;
+                            note right
+                            walletService.SetBalance()
+                            TransType = Refunds
+                            ====
+                            * SP: 
+                                Allow Negative: Service_SeamlessWallet_Set
+                                NotAllow Negative: Wallet_Set
+                            end note              
+                        else ()
+                        
+                            :sMemo = Payout:{backAmount};
+                            if (betRecord.TicketStatus == FreeBetWin) then (true)                            
+                                :sMemo = Free Bet Payout:{backAmount};                           
+                            endif
+
+                            #PaleGreen:Set Balance;
+                            note right
+                            walletService.SetBalance()
+                            TransType = Payout
+                            ====
+                            * SP: 
+                                Allow Negative: Service_SeamlessWallet_Set
+                                NotAllow Negative: Wallet_Set
+                            end note                            
+                        endif           
+            endif          
+        endif
+    }
+
+    -> betRecord, RefBetRecord;
+
+    if (betRecord.ValidBet != null) then (true)                   
+    :ValidBet = betRecord.ValidBet;         
+    else(false)       
+    :ValidBet = betRecord.Stake;
+    endif
+
+    -> betRecord, RefBetRecord, ValidBet;
+
+    if (RefBetRecord != null \n AND \n RefBetRecord.BonusId > 0) then (true)                   
+    :betRecord.BonusId = RefBetRecord.BonusId;            
+    endif
+    -> betRecord, RefBetRecord, ValidBet;
+    
+    :bonusId = betRecord.BonusId;
+
+    -> betRecord, RefBetRecord, ValidBet, bonusId;
+
+    partition Set_TurnOver_of_RollOver {
+        if (RefBetRecord == null) then (true)                
+            if (betRecord.SettlementType == SettledForValid) then (true)                               
+                #PaleGreen:Set RollOver TurnOver;
+                note right
+                settledService.SetRollOverTurnOver()
+                Turnover= validBet
+                Memo= Settled
+                ====
+                * SP: Service_RolloverTurnover_Set
+                end note
+            endif
+        else (false)
+
+            if (RefBetRecord.ValidBet != null) then (true)                   
+            :refValidBet = RefBetRecord.ValidBet;         
+            else(false)       
+            :refValidBet = RefBetRecord.Stake;
+            endif
+            -> betRecord, RefBetRecord, ValidBet, bonusId, refValidBet;
+            if (RefBetRecord.SettlementType != SettledForValid \n AND \n betRecord.SettlementType == SettledForValid) then (true)
+                #PaleGreen:Set RollOver TurnOver;
+                note right
+                settledService.SetRollOverTurnOver()
+                Turnover= validBet
+                Memo= Settled
+                ====
+                * SP: Service_RolloverTurnover_Set
+                end note
+            elseif (RefBetRecord.SettlementType == SettledForValid \n AND \n betRecord.SettlementType == UnSettled) then (true)
+                #PaleGreen:Set RollOver TurnOver;
+                note right
+                settledService.SetRollOverTurnOver()
+                Turnover= refValidBet * -1
+                Memo= UnSettled
+                ====
+                * SP: Service_RolloverTurnover_Set
+                end note
+            elseif (RefBetRecord.SettlementType == SettledForValid \n AND \n betRecord.SettlementType != SettledForValid) then (true)
+                #PaleGreen:Set RollOver TurnOver;
+                note right
+                settledService.SetRollOverTurnOver()
+                Turnover= refValidBet * -1
+                Memo= Re-Settled
+                ====
+                * SP: Service_RolloverTurnover_Set
+                end note
+            elseif (RefBetRecord.SettlementType == SettledForValid \n AND \n betRecord.SettlementType == SettledForValid \n AND \n refValidBet != validBet) then (true)
+                #PaleGreen:Set RollOver TurnOver;
+                note right
+                settledService.SetRollOverTurnOver()
+                Turnover= validBet - refValidBet
+                Memo= Re-Settled
+                ====
+                * SP: Service_RolloverTurnover_Set
+                end note 
+            endif
+        endif
+    }
+
+    -> betRecord, RefBetRecord, ValidBet, bonusId;
+
+    partition Set_TurnOver_of_WithdrawalLimit {
+        if(bonusId == 0) then (ture)
+            if (RefBetRecord == null) then (true)
+                if(betRecord.TicketStatus == Lost \n OR \n betRecord.TicketStatus == Win \n OR \n betRecord.TicketStatus == Draw)) then (true)
+                    #PaleGreen:Set TurnOver of WithdrawalLimit;
+                    note right
+                    settledService.SetWithdrawalLimitTurnOver()
+                    Turnover= validBet
+                    Memo= Settled
+                    ====
+                    * SP: Common_WithdrawalLimitTurnOver_Set
+                    end note
+                endif
+            else()
+                if (RefBetRecord.ValidBet != null) then (true)                   
+                :refValidBet = RefBetRecord.ValidBet;         
+                else(false)       
+                :refValidBet = RefBetRecord.Stake;
+                endif
+                
+                -> betRecord, RefBetRecord, ValidBet, bonusId, refValidBet;
+
+                if((RefBetRecord.TicketStatus == UnSettled \n OR \n RefBetRecord.TicketStatus == Refund) \n AND \n (betRecord.TicketStatus == Lost \n OR \n betRecord.TicketStatus == Win \n OR \n betRecord.TicketStatus == Draw)) then (true)
+                    #PaleGreen:Set TurnOver of WithdrawalLimit;
+                    note right
+                    settledService.SetWithdrawalLimitTurnOver()
+                    Turnover= validBet
+                    Memo= Settled
+                    ====
+                    * SP: Common_WithdrawalLimitTurnOver_Set
+                    end note
+                elseif ((RefBetRecord.TicketStatus == Lost \n OR \n RefBetRecord.TicketStatus == Win \n OR \n RefBetRecord.TicketStatus == Draw) \n AND \n (betRecord.TicketStatus == Refund \n OR \n betRecord.TicketStatus == UnSettled)) then (true)
+                    #PaleGreen:Set TurnOver of WithdrawalLimit;
+                    note right
+                    settledService.SetWithdrawalLimitTurnOver()
+                    Turnover= refValidBet * -1
+                    Memo= betRecord.TicketStatus == UnSettled ? "UnSettled" : "Re-Settled"
+                    ====
+                    * SP: Common_WithdrawalLimitTurnOver_Set
+                    end note
+                elseif ((betRecord.TicketStatus == Win \n OR \n betRecord.TicketStatus == Lost \n OR \n betRecord.TicketStatus == Draw) \n AND \n refValidBet != validBet) then (true)
+                    #PaleGreen:Set TurnOver of WithdrawalLimit;
+                    note right
+                    settledService.SetWithdrawalLimitTurnOver()
+                    Turnover= validBet - refValidBet
+                    Memo= Re-Settled
+                    ====
+                    * SP: Common_WithdrawalLimitTurnOver_Set
+                    end note
+                endif
+            endif
+        endif
+    }
+
+    -> betRecord, RefBetRecord, ValidBet, bonusId;
+
+    partition Set_WinLostAmount_of_Cust {
+        if(betRecord.WinlostAmount > 0) then (true)
+        :Winnings = betRecord.WinlostAmount;
+        else
+        :Winnings = 0;
+        endif
+
+        if(betRecord.WinlostAmount < 0) then (true)
+        :Losses = betRecord.WinlostAmount;
+        else
+        :Losses = 0;
+        endif 
+
+        -> betRecord, RefBetRecord, ValidBet, bonusId, Winnings, Losses;
+
+        if (RefBetRecord == null \n AND \n betRecord.WinlostAmount != 0) then (true)
+            if (betRecord.TicketStatus == Lost \n OR \n betRecord.TicketStatus == Win \n OR \n betRecord.TicketStatus == FreeBetWin) then (true)
+                #PaleGreen:Set WinLostAmount;
+                note right
+                    settledService.SetWinLostAmount()
+                    Winnings= Winnings
+                    Losses= Losses
+                    Memo= Settled
+                    ====
+                    * SP: Common_WinLostAmount_Set
+                end note
+            endif
+
+            if (bonusId > 0) then (true)
+                #PaleGreen:Set BonusWinLost;
+                note right
+                    settledService.SetBonusWinLost()
+                    Winnings= Winnings
+                    Losses= Losses
+                    Memo= Settled
+                    ====
+                    * SP: Service_BonusWinLost_Set
+                end note
+            endif
+
+            if (Losses != 0) then (true)
+                if (bonusId > 0) then (true)
+                    #PaleGreen:AutoCancelSeamlessBonus;
+                    note right
+                        settledService.AutoCancelSeamlessBonus()
+                        ====
+                        * SP: Service_AutoCancelSeamlessBonus_Set
+                    end note
+                endif
+            endif
+                                                                      
+        elseif(RefBetRecord != null) then (true)
+            
+            if(RefBetRecord.WinlostAmount > 0) then (true)
+            :refWinnings = RefBetRecord.WinlostAmount;
+            else
+            :refWinnings = 0;
+            endif
+
+            if(RefBetRecord.WinlostAmount < 0) then (true)
+            :refLosses = RefBetRecord.WinlostAmount;
+            else
+            :refLosses = 0;
+            endif
+            -> betRecord, RefBetRecord, ValidBet, bonusId, Winnings, Losses, refWinnings, refLosses;
+
+            if ((RefBetRecord.TicketStatus == UnSettled \n OR \n RefBetRecord.TicketStatus == Refund) \n AND \n (betRecord.TicketStatus == Lost \n OR \n betRecord.TicketStatus == Win \n OR \n betRecord.TicketStatus == FreeBetWin)) then (true)
+                
+                #PaleGreen:Set WinLostAmount;
+                note right
+                    settledService.SetWinLostAmount()
+                    Winnings= Winnings
+                    Losses= Losses
+                    Memo= Settled
+                    ====
+                    * SP: Common_WinLostAmount_Set
+                end note
+
+                if (bonusId > 0) then (true)
+                #PaleGreen:Set BonusWinLost;
+                note right
+                    settledService.SetBonusWinLost()
+                    Winnings= Winnings
+                    Losses= Losses
+                    Memo= Settled
+                    ====
+                    * SP: Service_BonusWinLost_Set
+                end note
+                endif
+
+                if (Losses != 0) then (true)
+                    if (bonusId > 0) then (true)
+                        #PaleGreen:AutoCancelSeamlessBonus;
+                        note right
+                            settledService.AutoCancelSeamlessBonus()
+                            ====
+                            * SP: Service_AutoCancelSeamlessBonus_Set
+                        end note
+                    endif
+                endif
+
+            elseif((RefBetRecord.TicketStatus == Lost \n OR \n RefBetRecord.TicketStatus == Win \n OR \n RefBetRecord.TicketStatus == FreeBetWin) \n AND \n (betRecord.TicketStatus == UnSettled \n OR \n betRecord.TicketStatus == Refund)) then (true)
+                
+                #PaleGreen:Set WinLostAmount;
+                note right
+                    settledService.SetWinLostAmount()
+                    Winnings= refWinnings * -1
+                    Losses= refLosses * -1
+                    Memo= Settled To Refund
+                    ====
+                    * SP: Common_WinLostAmount_Set
+                end note
+
+                if (bonusId > 0) then (true)
+                #PaleGreen:Set BonusWinLost;
+                note right
+                    settledService.SetBonusWinLost()
+                    Winnings= refWinnings * -1
+                    Losses= refLosses * -1
+                    Memo= Settled To Refund
+                    ====
+                    * SP: Service_BonusWinLost_Set
+                end note
+                endif
+
+            elseif((RefBetRecord.TicketStatus == Lost \n OR \n RefBetRecord.TicketStatus == Win \n OR \n RefBetRecord.TicketStatus == Draw \n OR \n RefBetRecord.TicketStatus == FreeBetWin) \n AND \n (betRecord.TicketStatus == Lost \n OR \n betRecord.TicketStatus == Win \n OR \n betRecord.TicketStatus == FreeBetWin)) then (true)
+                 
+                 if (refWinnings != Winnings \n OR \n refLosses != Losses) then (true)
+                        
+                        #PaleGreen:Set WinLostAmount;
+                        note right
+                            settledService.SetWinLostAmount()
+                            Winnings= Winnings - refWinnings
+                            Losses= Losses - refLosses
+                            Memo= Settled
+                            ====
+                            * SP: Common_WinLostAmount_Set
+                        end note
+
+                        if (bonusId > 0) then (true)
+                        #PaleGreen:Set BonusWinLost;
+                        note right
+                            settledService.SetBonusWinLost()
+                            Winnings= Winnings - refWinnings
+                            Losses= Losses - refLosses
+                            Memo= Settled
+                            ====
+                            * SP: Service_BonusWinLost_Set
+                        end note
+                        endif
+
+                        if (Losses != 0) then (true)
+                            if (bonusId > 0) then (true)
+                                #PaleGreen:AutoCancelSeamlessBonus;
+                                note right
+                                    settledService.AutoCancelSeamlessBonus()
+                                    ====
+                                    * SP: Service_AutoCancelSeamlessBonus_Set
+                                end note
+                            endif
+                        endif
+
+                 endif
+
+            endif
+
+        endif
+    }
+
+    -> betRecord, RefBetRecord, ValidBet, bonusId;
+
+    partition Set_EffectiveBet_of_Cust {
+        if (RefBetRecord == null) then (true)
+
+            if (betRecord.TicketStatus == Lost \n OR \n betRecord.TicketStatus == Win \n OR \n betRecord.TicketStatus == Draw) then (true)
+                #PaleGreen:Set Effective Bet;
+                note right
+                    settledService.SetEffectiveBetSum()
+                    validBet=validBet
+                    ====
+                    * SP: Service_EffectiveBetSum_Set
+                end note         
+            endif
+
+        else(false)
+
+            if (RefBetRecord.ValidBet != null) then (true)
+            :refValidBet=RefBetRecord.ValidBet;
+            else
+            :refValidBet=RefBetRecord.Stake;
+            endif
+
+            -> refValidBet;
+
+            if((RefBetRecord.TicketStatus == UnSettled \n OR \n RefBetRecord.TicketStatus == Refund) \n AND \n (betRecord.TicketStatus == Lost \n OR \n betRecord.TicketStatus == Win \n OR \n betRecord.TicketStatus == Draw)) then (true)
+                
+                #PaleGreen:Set Effective Bet;
+                note right
+                    settledService.SetEffectiveBetSum()
+                    validBet= validBet
+                    ====
+                    * SP: Service_EffectiveBetSum_Set
+                end note 
+
+            elseif((RefBetRecord.TicketStatus == Lost \n OR \n RefBetRecord.TicketStatus == Win \n OR \n RefBetRecord.TicketStatus == Draw) \n AND \n (betRecord.TicketStatus == UnSettled \n OR \n betRecord.TicketStatus == Refund)) then (true)
+                
+                #PaleGreen:Set Effective Bet;
+                note right
+                    settledService.SetEffectiveBetSum()
+                    validBet= refValidBet * -1
+                    ====
+                    * SP: Service_EffectiveBetSum_Set
+                end note 
+
+            elseif((RefBetRecord.TicketStatus == Lost \n OR \n RefBetRecord.TicketStatus == Win \n OR \n RefBetRecord.TicketStatus == Draw) \n AND \n (betRecord.TicketStatus == Lost \n OR \n betRecord.TicketStatus == Win \n OR \n betRecord.TicketStatus == Draw)) then (true)
+                 
+                 if (refValidBet != validBet) then (true)
+                    
+                    #PaleGreen:Set Effective Bet;
+                    note right
+                        settledService.SetEffectiveBetSum()
+                        validBet= validBet - refValidBet
+                        ====
+                        * SP: Service_EffectiveBetSum_Set
+                    end note 
+
+                 endif
+
+            endif
+
+        endif
+    }
+
+    -> betRecord, RefBetRecord;
+
+        if (RefBetRecord == null) then (true)
+        #PaleGreen:Add TpBetRecord;
+        note right
+            settledService.AddTpBetRecord()
+            ====
+            * SP: Service_TpSettleBet_Ins
+        end note
+        -> Insert result;
+        :result = Insert result;
+        else (false)
+        #PaleGreen:Update TpBetRecord;
+        note right
+            settledService.SetTpBetRecord()
+            ====
+            * SP: Service_TpSettleBet_Set
+        end note
+        -> Update result;
+        :result = Update result;
+        endif
+        -> result;
+}
+-> result;
+if (result > 0) then (true)
+:Commit;
+endif
+stop
+@enduml

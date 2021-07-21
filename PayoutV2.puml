@@ -1,0 +1,101 @@
+@startuml PayoutV2
+title ** PayoutV2 **
+skinparam ConditionEndStyle hline
+start
+-> bHasBonusWallet,amount, tpTransId;
+if(bHasBonusWallet) then (true)
+
+  #PaleGreen:Get Tp Bonus;
+  note right
+    SettledService.GetTpBonus()
+    ====
+    * SP: Service_Tp{tpCategory}Bonus_Get
+  end note
+  
+  -> result;
+  if (bonusId > 0 \n OR \n transType == TransType.Prize) then (true)
+    
+    if (bonusId > 0 \n AND \n custId != tpCustInfo.CustId) then (true)
+        :result = 0;
+        -> result;
+        stop
+    endif
+ 
+    -> result;
+
+    #PaleGreen:Set Bonus;
+    note right
+      walletService.SetBonus()
+      ====
+      * SP: Service_BonusWallet_Set
+    end note
+
+    -> result, afterBonus;
+
+    if((transType == Prize \n AND \n bonusId == 0) \n OR \n afterBonus < 0 \n OR \n bonusId == -1) then (true)
+        
+        #PaleGreen:Set Balance;
+        note right
+        walletService.SetBalance()
+        ====
+        * SP: 
+            Allow Negative: Service_SeamlessWallet_Set
+            NotAllow Negative: Wallet_Set
+        end note
+
+    else()
+
+        #PaleGreen:GetBalance;
+          note right
+          walletService.GetBalance()
+          ====
+          * SP: Balance_Get
+        end note
+        -> result, afterBonus, Balance;
+        :afterAmount = afterBonus + Balance;
+        -> result, afterAmount;
+      
+    endif
+
+    if (afterBonus > 0) then (true)
+
+      #PaleGreen:AutoRunningSeamlessBonus;
+      note right
+        check bonus status and update status cancel to running
+        SettledService.AutoRunningSeamlessBonus()
+        ====
+        * SP: Service_AutoRunningSeamlessBonus_Set
+      end note
+      
+    endif
+                   
+  else ()
+
+    #PaleGreen:Set Balance;
+    note right
+    walletService.SetBalance()
+    ====
+    * SP: 
+        Allow Negative: Service_SeamlessWallet_Set
+        NotAllow Negative: Wallet_Set
+    end note
+
+  endif
+
+  -> result, afterAmount;
+
+else ()
+
+  #PaleGreen:Set Balance;
+  note right
+  walletService.SetBalance()
+  ====
+  * SP: 
+      Allow Negative: Service_SeamlessWallet_Set
+      NotAllow Negative: Wallet_Set
+  end note
+
+endif
+-> result, afterAmount;
+stop
+@enduml
