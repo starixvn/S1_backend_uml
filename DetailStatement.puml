@@ -1,0 +1,55 @@
+@startuml 
+title ** DetailStatement **
+
+actor User
+participant 前台 
+actor Admin
+participant 後台 
+participant Settle.Worker 
+
+database    BetDetail   
+database  TodoTable
+database  DetailTable
+participant Detail.Worker 
+
+Group GetBetDetail
+Settle.Worker-> Settle.Worker: 定期執行
+Settle.Worker -> BetDetail : Insert / Update \n Settle BetRecord 
+BetDetail -> TodoTable :  Insert \n TpId、TransId
+Detail.Worker-> Detail.Worker: 定期執行
+Detail.Worker -> TodoTable : Select \n TpId、TransId
+TodoTable -> Detail.Worker : Get TpId、TransId
+Detail.Worker -> TPHanlder :TpId、TransId
+TPHanlder -> TPHanlder:TpId Invoke TPMethod
+TPHanlder -> TPMethod:TransId
+TPMethod -> ThirdPartyAPI :TransId
+ThirdPartyAPI -> ThirdPartyAPI :Get Bet Detail
+ThirdPartyAPI -> TPMethod : Bet Detail
+TPMethod -> TPHanlder : Bet Detail
+TPHanlder -> Detail.Worker : Bet Detail
+Detail.Worker ->  DetailTable : Insert Bet Detail
+alt Success
+    Detail.Worker ->  TodoTable : Delete TpId、TransId
+else Fail
+    Detail.Worker ->  TodoTable : 等待下一次執行
+end
+
+
+END
+
+Group 前台查詢
+User -> 前台:查詢 Bet Detail
+前台 -> BetDetail:TransId
+BetDetail -> DetailTable:TransId
+DetailTable -> BetDetail : Bet Detail
+BetDetail -> 前台 : Bet Detail
+END
+
+GROUP 後台查詢
+Admin -> 後台:查詢 Bet Detail
+後台 -> BetDetail:TransId
+BetDetail -> DetailTable:TransId
+DetailTable -> BetDetail : Bet Detail
+BetDetail -> 後台 : Bet Detail
+END
+@enduml
