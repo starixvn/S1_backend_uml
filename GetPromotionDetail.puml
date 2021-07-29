@@ -1,0 +1,21 @@
+@startuml
+participant frontend as fe
+participant MemberSite as ms
+database Siebog as db
+
+fe -> ms : GetPromotionDetail
+ms -> db : Member_PromotionV3_Get
+db -> ms : CustPromotion
+ms -> ms : details settings
+ms -> db : Member_PromotionCanJoinV6_Get
+ms -> ms : 根據PromotionType做不同處理
+alt Rebate
+    ms -> db : Member_RebateInfo_GetByCust
+else other bonus
+    ms -> db : Member_BonusInfo_GetByCust
+    alt Cashback
+        ms -> db : Member_CustCashBackCheck_Get
+    end
+end
+ms -> fe
+@enduml

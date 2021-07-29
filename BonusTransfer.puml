@@ -1,0 +1,55 @@
+@startuml
+participant TpService as tps
+database Siebog as db
+participant thirdParty as tp
+
+group GetTpCustInfo
+    tps -> db: TpCustInfo_Get
+    alt not exist
+    tps -> db: Customer_Get
+    tps -> db: TpCurrency_Get
+    tps -> tp: CreateMember
+    tps -> db: TpCustInfo_Ins
+    note right
+        TpCustInfo
+    end note
+    end
+end
+tps -> tp: GetBalance
+group TpTransferBonusReq
+    tps -> db: Service_TpTransferBonusInfo_Ins
+    note right
+        TpTransferBonusInfo
+    end note
+    tps -> db: Common_BonusTransferOutAll_Set
+    note right
+        CustBonus
+        BonusLog
+    end note
+    tps -> db: Service_TpTransferBonusInfo_Set
+    note right
+        TpTransferBonusInfo
+    end note
+end
+group Transfer
+    tps -> tp: Transfer
+    alt success
+    tps -> db: Service_TpTransferBonusInfoStatus_Set
+    note right
+        TpTransferBonusInfo
+    end note
+    tps -> db: Common_BonusStatus_Set
+    note right
+        CustBonus
+    end note
+    else
+    tps -> db: Service_TpTransferBonusInfoStatus_Set
+    tps -> db: Common_BonusTransferRollback_Set
+    note right
+        CustBonus
+        BonusLog
+    end note
+    end
+end
+tps -> db: TpLastTradingTime_Set
+@enduml
