@@ -1,0 +1,23 @@
+@startuml
+participant backoffice as bo
+participant BackendSite as bs
+database Siebog as db
+
+bo -> bs: SetPromotion
+bs -> db: Admin_PromotionV3_Set
+note right 
+Promotion
+end note
+bs -> db: Admin_PromotionSpecificV3_Set
+note right 
+PromotionSpecific
+end note
+db -> bs:
+alt rebate or cashback
+    bs -> db: Admin_PromotionRebate_Set
+    note right 
+    PromotionRebate
+    end note
+end
+bs -> bo:
+@enduml

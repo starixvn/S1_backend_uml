@@ -1,0 +1,58 @@
+@startuml
+participant frontend as fe
+participant MemberSite as ms
+database Siebog as db
+participant ThirdPartyService as tps
+
+fe -> ms : SetClaimPromotion
+ms -> db : Member_PromotionV3_Get
+db -> ms : Promotion
+alt FreeBet
+    ms -> db : Service_BlockFreeBet_Get
+end
+ms -> db : Member_PromotionCanJoinV6_Get
+ms -> ms : 根據PromotionType做不同處理
+ms -> db : Member_BonusInfo_Ins
+note right 
+BonusInfo
+end note
+
+ms -> db : Wallet_Set
+note right 
+FinancialLog
+CustWallet
+end note
+
+ms -> db : Common_WithdrawalLimit_Set
+note right 
+WithdrawalLimitLog
+CustWithdrawalLimit
+end note
+
+alt Rebate
+    ms -> db : Common_Rebate_Ins
+    note right 
+    RebateInfo
+    end note
+else other bonus
+    ms -> db : Common_Bonus_Ins
+    note right 
+    CustBonus
+    CustBonusRollover
+    BonusLog
+    CustTransSummary
+    end note
+
+    alt Cashback
+    ms -> db : Member_CustCashBack_Set
+    note right 
+    CustCashBack
+    end note
+    end
+end
+ms -> db : Member_PromotionBeenUsedV2_Set
+alt wallet type = transfer
+ms -> tps: BonusTransfer
+end
+ms -> fe
+@enduml
