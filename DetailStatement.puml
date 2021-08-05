@@ -6,19 +6,26 @@ participant 前台
 actor Admin
 participant 後台 
 participant Settle.Worker 
+participant Wager.Worker 
 
-database    BetDetail   
-database  TodoTable
-database  DetailTable
+
+database  TpBetRecord   
+database  TpDetailTodo
+database  TpBetRecordDetail
 participant Detail.Worker 
+Group GetDetail by Wager.Worker
+Wager.Worker -> Wager.Worker : 定期執行
+Wager.Worker -> TpBetRecordDetail : Insert / Update \n Bet Detail
+END
 
-Group GetBetDetail
+
+Group GetDetail by Detail.Worker
 Settle.Worker-> Settle.Worker: 定期執行
-Settle.Worker -> BetDetail : Insert / Update \n Settle BetRecord 
-BetDetail -> TodoTable :  Insert \n TpId、TransId
+Settle.Worker -> TpBetRecord : Insert / Update \n Settle BetRecord 
+TpBetRecord -> TpDetailTodo :  Insert \n TpId、TransId
 Detail.Worker-> Detail.Worker: 定期執行
-Detail.Worker -> TodoTable : Select \n TpId、TransId
-TodoTable -> Detail.Worker : Get TpId、TransId
+Detail.Worker -> TpDetailTodo : Select \n TpId、TransId
+TpDetailTodo -> Detail.Worker : Get TpId、TransId
 Detail.Worker -> TPHanlder :TpId、TransId
 TPHanlder -> TPHanlder:TpId Invoke TPMethod
 TPHanlder -> TPMethod:TransId
@@ -27,11 +34,11 @@ ThirdPartyAPI -> ThirdPartyAPI :Get Bet Detail
 ThirdPartyAPI -> TPMethod : Bet Detail
 TPMethod -> TPHanlder : Bet Detail
 TPHanlder -> Detail.Worker : Bet Detail
-Detail.Worker ->  DetailTable : Insert Bet Detail
+Detail.Worker ->  TpBetRecordDetail : Insert / Update \n Bet Detail
 alt Success
-    Detail.Worker ->  TodoTable : Delete TpId、TransId
+    Detail.Worker ->  TpDetailTodo : Delete TpId、TransId
 else Fail
-    Detail.Worker ->  TodoTable : 等待下一次執行
+    Detail.Worker ->  TpDetailTodo : 等待下一次執行
 end
 
 
@@ -39,17 +46,17 @@ END
 
 Group 前台查詢
 User -> 前台:查詢 Bet Detail
-前台 -> BetDetail:TransId
-BetDetail -> DetailTable:TransId
-DetailTable -> BetDetail : Bet Detail
-BetDetail -> 前台 : Bet Detail
+前台 -> TpBetRecord:TransId
+TpBetRecord -> TpBetRecordDetail:TransId
+TpBetRecordDetail -> TpBetRecord : Bet Detail
+TpBetRecord -> 前台 : Bet Detail
 END
 
 GROUP 後台查詢
 Admin -> 後台:查詢 Bet Detail
-後台 -> BetDetail:TransId
-BetDetail -> DetailTable:TransId
-DetailTable -> BetDetail : Bet Detail
-BetDetail -> 後台 : Bet Detail
+後台 -> TpBetRecord:TransId
+TpBetRecord -> TpBetRecordDetail:TransId
+TpBetRecordDetail -> TpBetRecord : Bet Detail
+TpBetRecord -> 後台 : Bet Detail
 END
 @enduml
