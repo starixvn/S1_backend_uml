@@ -4,17 +4,14 @@ title ** DetailStatement **
 actor Admin
 participant BackOffice 
 participant Settle.Worker 
-participant Wager.Worker 
+participant GetBetDetail.API #99FF99
 
-database  TpBetRecord   
-database  TpDetailTodo
-database  TpBetRecordDetail
-participant TP.Detail.Worker 
-Group GetDetail by Wager.Worker
-Wager.Worker -> Wager.Worker : 定期執行
-Wager.Worker -> TpBetRecordDetail : Insert / Update \n Bet Detail
-END
-
+database  TpBetRecord
+database  WagerTable  
+database  TpDetailTodo  #99FF99
+database  TpBetRecordDetail #99FF99
+participant TP.Detail.Worker  #99FF99
+participant TP.Helper  #99FF99
 
 Group GetDetail by TP.Detail.Worker
 Settle.Worker-> Settle.Worker: 定期執行
@@ -40,9 +37,16 @@ END
 
 GROUP BackOffice Search
 Admin -> BackOffice:Search Bet Detail
-BackOffice -> TpBetRecordDetail:TpId、TransId\n 、GameType
-TpBetRecordDetail -> BackOffice : Get Detail data
-BackOffice -> BackOffice: Detail \nMapping Interface \nby TpCategory
+BackOffice -> GetBetDetail.API:TpId、TransId\n 、GameType
+alt TP.Detail.Worker
+    GetBetDetail.API -> TpBetRecordDetail:Get Detail data
+    TpBetRecordDetail -> GetBetDetail.API:Detail Data
+else Wager..Worker
+    GetBetDetail.API -> WagerTable : Get Detail data
+    WagerTable -> GetBetDetail.API:Detail Data
+end
+GetBetDetail.API -> GetBetDetail.API: Detail Data \nMapping Interface \nby TpCategory
+GetBetDetail.API -> BackOffice
 BackOffice -> Admin : TpCategory \nDetail
 END
 @enduml
