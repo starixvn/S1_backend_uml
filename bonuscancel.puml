@@ -1,0 +1,20 @@
+@startuml
+participant backoffice as bo
+participant BackendSite as bs
+database Siebog as db
+
+bo -> bs: [api/PendingFund/BonusCancel] \n[api/CustManage/CancelBonusByBonusId]
+
+bs -> db: Common_CancelBonusByBonusId_SetV3
+note right 
+CustBonus
+CustBonusRollover
+BonusInfo
+end note
+
+alt Pending Bonus Cancel 且 退回金額大於0
+    bs -> db: Wallet_Set
+    bs -> db: Common_WithdrawalLimit_Set
+end
+bs -> bo:
+@enduml

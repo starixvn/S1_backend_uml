@@ -1,0 +1,13 @@
+@startuml
+participant 第三方 as th
+participant TpSW as tpsw
+database Siebog as db
+
+th -> tpsw: 根據第三方文件實作的投注API
+
+alt 不在投注限額區間
+    tpsw -> th: 投注失敗
+else 
+    tpsw -> db: 更新錢包
+end
+@enduml

@@ -1,0 +1,18 @@
+@startuml
+participant backoffice as bo
+participant BackendSite as bs
+participant ThirdPartyService as tps
+database Siebog as db
+
+bo -> bs: PostUserBetLimit
+alt Sport
+    bs -> tps: SetBetLimit
+end
+bs -> db: Admin_CustBetLimit_Set
+note right 
+CustBetLimit
+end note
+db -> bs:
+bs -> bo:
+
+@enduml

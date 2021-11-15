@@ -1,0 +1,19 @@
+@startuml
+participant BonusService as bs
+database Siebog as db
+
+bs -> db: Service_BonusExpired_Get
+db -> bs:
+
+alt 退回金額大於0
+    bs -> db: Wallet_Set
+    bs -> db: Common_WithdrawalLimit_Set
+end
+bs -> db: Service_BonusExpired_Set
+note right 
+CustBonus
+CustBonusRollover
+BonusInfo
+end note
+db -> bs:
+@enduml
