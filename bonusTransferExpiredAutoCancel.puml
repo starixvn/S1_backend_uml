@@ -1,0 +1,42 @@
+@startuml
+title ** Transfer Bonus Expired Auto Cancel **
+participant BonusService as bs
+participant TpService as ts
+database Siebog as db
+participant 第三方 as tp
+
+
+bs -> db: 取得過期紅利且注單皆已結算 Service_TransferBonusExpired_Get
+db -> bs:
+bs -> bs: 計算退回本金
+bs -> bs: 計算剩餘 Bonus
+alt 剩餘 Bonus 大於0
+    bs -> ts: [BonusCancelTransfer]
+    ts -> db: 驗證轉帳單號是否在處理中 Service_TpTransferInfo_Bonus_Get
+    note right 
+    TpTransferInfo
+    end note
+    db -> ts:
+    alt 轉帳處理中
+        ts -> bs: Transfer Processing.
+    end
+        ts -> tp: 取餘額 [GetBalance]
+        tp -> ts:
+        ts -> ts: 檢查第三方剩餘金額並判斷是否需要修改 Bonus Amount
+        ts -> db: 紀錄轉帳單號 Service_TpTransferInfo_Ins
+        ts -> tp: 餘額從第三方轉回主錢包 [Transfer]
+        tp -> ts:
+        alt 轉回成功
+            ts -> db: 更新轉帳狀態 TpTransferInfo_Set
+            ts -> db: 取消紅利 Service_BonusExpired_Set
+            ts -> db: 更新主錢包餘額 Wallet_Set
+            alt 退回本金 > 0
+            ts -> db: 加回提款限額 Common_WithdrawalLimit_Set
+            end
+        end
+        ts -> bs:
+end
+alt 剩餘 Bonus 等於0
+    bs -> db: 取消紅利 Service_BonusExpired_Set
+end
+@enduml
