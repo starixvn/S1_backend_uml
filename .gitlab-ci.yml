@@ -1,0 +1,69 @@
+stages:
+  - sync
+
+variables:
+  GITLABTW_API_URL: http://gitlab2.n88dev.com/api/v4
+  GITLABTW_TOKEN: glpat-YfdihyynWJHSXeeRoKDm
+  TW_FE_GITLABTW_GROUP: frontend
+  FE_GROUP_ID: 579
+  FE_GROUP_URL: $CI_SERVER_URL/s1-testing/frontend
+  TW_BE_GITLABTW_GROUP: backend
+  BE_GROUP_ID: 580
+  BE_GROUP_URL: $CI_SERVER_URL/s1-testing/backend
+
+
+.sync_base:
+  stage: sync
+  tags:
+    - docker
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - when: manual
+  before_script:
+    - |
+      git config --global user.email 'rocketor.vn@nexcel.com'
+      git config --global user.name 'Rocketor.VN'
+      git config --global credential.helper store
+      echo 'http://oauth2:glpat-YfdihyynWJHSXeeRoKDm@gitlab2.n88dev.com' >> $HOME/.git-credentials
+      echo -e 'https://oauth2:glpat-i7UDNnuwdukMYXHbdzST@gitlab.nexdev.net\n' >> $HOME/.git-credentials
+  script:
+    - export SRC_PROJECTS=$(curl --no-progress-meter "$GITLABTW_API_URL/groups/$GITLABCOM_GROUP/projects?private_token=$GITLABTW_TOKEN&per_page=$GITLABCOM_PAGE_SIZE&page=$GITLABCOM_PAGE&simple=true&archived=false" | jq .)
+    - |
+      echo $SRC_PROJECTS | jq -c '.[]' | while read project; do
+        {
+          export SRC_PROJECT_NAME=$(echo $project | jq '.path' | tr -d \")
+          export SRC_REPO_URL=$(echo $project | jq '.http_url_to_repo' | tr -d \")
+          echo "***$SRC_PROJECT_NAME $SRC_REPO_URL***"
+          git clone $SRC_REPO_URL $SRC_PROJECT_NAME
+          cd $SRC_PROJECT_NAME
+          echo "***Create gitlabnexdev project $SRC_PROJECT_NAME***"
+          curl --no-progress-meter --request POST --header "PRIVATE-TOKEN:glpat-i7UDNnuwdukMYXHbdzST" -F path=$SRC_PROJECT_NAME -F namespace_id=$GROUP_ID -F initialize_with_readme=false --url "$GITLAB_API_URL/projects/"
+          echo -e "\n***Push to gitlabnexdev $SRC_PROJECT_NAME***"
+          git remote add gitlabnexdev $GROUP_URL/${SRC_PROJECT_NAME}.git
+          git push gitlabnexdev --tags "refs/remotes/origin/*:refs/heads/*"
+          cd ../
+        } || true
+      done
+
+sync_fe_page1:
+  extends:
+    - .sync_base
+  variables:
+    GITLABCOM_GROUP: $TW_FE_GITLABTW_GROUP
+    GITLABCOM_PAGE: 1
+    GITLABCOM_PAGE_SIZE: 30
+    GROUP_ID: $FE_GROUP_ID
+    GROUP_URL: $FE_GROUP_URL
+
+sync_be_page1:
+  extends:
+    - .sync_base
+  variables:
+    GITLABCOM_GROUP: $TW_BE_GITLABTW_GROUP
+    GITLABCOM_PAGE: 1
+    GITLABCOM_PAGE_SIZE: 30
+    GROUP_ID: $BE_GROUP_ID
+    GROUP_URL: $BE_GROUP_URL
+
+
+
