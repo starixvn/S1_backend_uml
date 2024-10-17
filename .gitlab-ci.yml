@@ -5,10 +5,10 @@ variables:
   GITLABTW_API_URL: http://gitlab2.n88dev.com/api/v4
   GITLABTW_TOKEN: glpat-YfdihyynWJHSXeeRoKDm
   TW_FE_GITLABTW_GROUP: Frontend
-  FE_GROUP_ID: 579
+  FE_GROUP_ID: 568
   FE_GROUP_URL: $CI_SERVER_URL/s1/frontend
   TW_BE_GITLABTW_GROUP: Backend
-  BE_GROUP_ID: 580
+  BE_GROUP_ID: 569
   BE_GROUP_URL: $CI_SERVER_URL/s1/backend
 
 
